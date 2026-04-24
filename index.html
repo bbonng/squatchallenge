@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0A0A0A">
+<title>SQUAT CHALLENGE</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+<style>
+:root {
+  --bg: #0A0A0A;
+  --bg-2: #141414;
+  --bg-3: #1E1E1E;
+  --orange: #FF6B00;
+  --orange-dark: #CC5500;
+  --green: #00FF8A;
+  --green-dark: #00CC6E;
+  --white: #FFFFFF;
+  --muted: #888;
+  --line: #2A2A2A;
+  --display: 'Bebas Neue', 'Noto Sans KR', sans-serif;
+  --body: 'Noto Sans KR', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--white);
+  font-family: var(--body);
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ========= CAMERA LAYER ========= */
+.camera-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  background: #000;
+}
+.camera-layer.show { display: block; }
+
+#videoInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  opacity: 0;
+  pointer-events: none;
+}
+#canvasOutput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ========= SCREENS ========= */
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.screen.active { display: flex; }
+
+/* ========= SCREEN 1: MODE SELECT ========= */
+#screen-mode {
+  background: var(--bg);
+  padding: 24px;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+#screen-mode::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -30%;
+  width: 80%; height: 80%;
+  background: radial-gradient(circle, rgba(255,107,0,0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+#screen-mode::after {
+  content: '';
+  position: absolute;
+  bottom: -40%; left: -30%;
+  width: 70%; height: 70%;
+  background: radial-gradient(circle, rgba(0,255,138,0.12) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.mode-header {
+  padding-top: 48px;
+  position: relative;
+  z-index: 2;
+}
+.mode-tag {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--orange);
+  color: var(--orange);
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 3px;
+  margin-bottom: 20px;
+}
+.mode-title {
+  font-family: var(--display);
+  font-size: clamp(64px, 18vw, 110px);
+  line-height: 0.9;
+  letter-spacing: 2px;
+  color: var(--white);
+}
+.mode-title .accent { color: var(--orange); }
+.mode-subtitle {
+  font-family: var(--body);
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 16px;
+  letter-spacing: 1px;
+}
+.mode-divider {
+  width: 60px;
+  height: 3px;
+  background: var(--green);
+  margin-top: 20px;
+}
+
+.mode-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  z-index: 2;
+  padding-bottom: 24px;
+}
+.mode-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  padding: 22px 22px;
+  text-align: left;
+  color: var(--white);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  font-family: var(--body);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mode-btn:active { transform: scale(0.98); }
+.mode-btn .num {
+  font-family: var(--display);
+  font-size: 28px;
+  color: var(--muted);
+  margin-right: 16px;
+  letter-spacing: 1px;
+}
+.mode-btn .label {
+  flex: 1;
+}
+.mode-btn .label-ko {
+  font-size: 20px;
+  font-weight: 700;
+}
+.mode-btn .label-en {
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.mode-btn .arrow {
+  font-family: var(--display);
+  font-size: 28px;
+  color: var(--muted);
+}
+.mode-btn.challenge {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #000;
+}
+.mode-btn.challenge .num { color: #000; opacity: 0.6; }
+.mode-btn.challenge .label-en { color: #000; opacity: 0.7; }
+.mode-btn.challenge .arrow { color: #000; }
+
+.mode-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.mode-link {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 14px;
+  font-family: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+/* ========= SCREEN 2: INFO ========= */
+#screen-info {
+  background: var(--bg);
+  padding: 24px;
+  gap: 24px;
+}
+.info-header {
+  padding-top: 48px;
+}
+.info-title {
+  font-family: var(--display);
+  font-size: 56px;
+  letter-spacing: 2px;
+  color: var(--white);
+}
+.info-sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 6px;
+}
+.info-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 20px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.field label {
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: var(--orange);
+}
+.field input {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--white);
+  padding: 18px;
+  font-size: 20px;
+  font-family: var(--body);
+  outline: none;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.field input:focus {
+  border-color: var(--orange);
+}
+.info-actions {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+.btn {
+  flex: 1;
+  padding: 20px;
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 3px;
+  border: none;
+  cursor: pointer;
+  font-weight: 400;
+}
+.btn-primary { background: var(--orange); color: #000; }
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--white);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+/* ========= SCREEN 3: CALIBRATION ========= */
+#screen-calibration {
+  background: transparent;
+  pointer-events: none;
+}
+#screen-calibration > * { pointer-events: auto; }
+
+.cal-top {
+  padding: 20px;
+  padding-top: calc(env(safe-area-inset-top) + 20px);
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+}
+.cal-title {
+  font-family: var(--display);
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+.cal-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.cal-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11px;
+}
+.cal-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-legend .dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.cal-legend .dot.orange { background: var(--orange); }
+.cal-legend .dot.green { background: var(--green); }
+
+.cal-controls {
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px;
+  pointer-events: none;
+}
+.cal-side {
+  display: flex;
+  flex-direction: column;
+  gap: 200px;
+  pointer-events: auto;
+}
+.cal-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-btn-group .cal-label {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-align: center;
+}
+.cal-btn-group.knee .cal-label { color: var(--orange); }
+.cal-btn-group.waist .cal-label { color: var(--green); }
+.cal-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.cal-btn-group.knee .cal-btn { border-color: var(--orange); color: var(--orange); }
+.cal-btn-group.waist .cal-btn { border-color: var(--green); color: var(--green); }
+.cal-btn:active { transform: scale(0.9); }
+
+.cal-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  padding: 20px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+  background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+/* ========= SCREEN 4: READY ========= */
+#screen-ready {
+  background: transparent;
+  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+}
+.ready-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 24px;
+  padding-top: calc(env(safe-area-inset-top) + 24px);
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  text-align: center;
+  pointer-events: auto;
+}
+.ready-title {
+  font-family: var(--display);
+  font-size: 32px;
+  letter-spacing: 3px;
+  color: var(--orange);
+}
+.ready-hint {
+  color: var(--white);
+  font-size: 14px;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+.ready-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 20px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  pointer-events: auto;
+}
+
+/* ========= SCREEN 5: COUNTDOWN ========= */
+#screen-countdown {
+  background: rgba(0,0,0,0.6);
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.countdown-num {
+  font-family: var(--display);
+  font-size: clamp(180px, 50vw, 280px);
+  line-height: 1;
+  color: var(--white);
+  text-shadow: 0 0 60px rgba(255,107,0,0.5);
+  animation: countPulse 1s ease-out;
+}
+.countdown-num.go {
+  color: var(--green);
+  text-shadow: 0 0 80px rgba(0,255,138,0.8);
+}
+@keyframes countPulse {
+  0% { transform: scale(0.3); opacity: 0; }
+  30% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ========= SCREEN 6: EXERCISE HUD ========= */
+#screen-exercise {
+  background: transparent;
+  pointer-events: none;
+}
+#screen-exercise > * { pointer-events: auto; }
+
+.hud-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 16px 20px;
+  padding-top: calc(env(safe-area-inset-top) + 16px);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+}
+
+.hud-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.hud-timer .lbl {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--muted);
+}
+.hud-timer .val {
+  font-family: var(--display);
+  font-size: 56px;
+  line-height: 0.9;
+  color: var(--green);
+  letter-spacing: 1px;
+}
+.hud-timer.warning .val { color: var(--orange); }
+.hud-timer.danger .val {
+  color: #FF3030;
+  animation: blink 0.5s infinite alternate;
+}
+@keyframes blink {
+  from { opacity: 1; }
+  to { opacity: 0.4; }
+}
+
+.hud-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.hud-count .lbl {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--muted);
+}
+.hud-count .val {
+  font-family: var(--display);
+  font-size: 80px;
+  line-height: 0.9;
+  color: var(--orange);
+  letter-spacing: 1px;
+}
+
+.hud-state {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 16px 20px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+.state-badge {
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 3px;
+  padding: 8px 18px;
+  border: 2px solid var(--muted);
+  color: var(--muted);
+  transition: all 0.2s;
+  min-width: 120px;
+  text-align: center;
+}
+.state-badge.active.up {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(0,255,138,0.1);
+}
+.state-badge.active.down {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: rgba(255,107,0,0.1);
+}
+
+.exit-btn {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 100px);
+  right: 16px;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--line);
+  color: var(--white);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ========= SCREEN 7: RESULT ========= */
+#screen-result {
+  background: var(--bg);
+  padding: 24px;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+#screen-result::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--orange), var(--green));
+}
+
+.result-header {
+  padding-top: 48px;
+}
+.result-label {
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 4px;
+  color: var(--muted);
+}
+.result-user {
+  font-size: 18px;
+  color: var(--white);
+  margin-top: 6px;
+  font-weight: 700;
+}
+.result-score {
+  text-align: center;
+  padding: 20px 0;
+}
+.result-score .num {
+  font-family: var(--display);
+  font-size: clamp(140px, 42vw, 220px);
+  line-height: 1;
+  color: var(--orange);
+  letter-spacing: 2px;
+}
+.result-score .unit {
+  font-family: var(--display);
+  font-size: 28px;
+  color: var(--muted);
+  letter-spacing: 4px;
+}
+.result-meta {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 12px;
+}
+.result-meta div {
+  text-align: center;
+}
+.result-meta .k {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+.result-meta .v {
+  font-family: var(--display);
+  font-size: 24px;
+  color: var(--green);
+  margin-top: 2px;
+}
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+.result-actions .row { display: flex; gap: 10px; }
+.result-actions .row .btn { flex: 1; }
+.submit-status {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 16px;
+}
+.submit-status.ok { color: var(--green); }
+.submit-status.err { color: #FF3030; }
+
+/* ========= SCREEN 8: RANKING ========= */
+#screen-ranking {
+  background: var(--bg);
+  padding: 24px;
+  gap: 16px;
+}
+.rank-header {
+  padding-top: 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.rank-title {
+  font-family: var(--display);
+  font-size: 56px;
+  letter-spacing: 2px;
+}
+.rank-title .accent { color: var(--green); }
+.rank-count {
+  font-size: 12px;
+  color: var(--muted);
+  padding-bottom: 8px;
+}
+
+.rank-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 4px;
+}
+.rank-row {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  padding: 14px 14px;
+  background: var(--bg-2);
+  border-left: 3px solid var(--line);
+  gap: 12px;
+}
+.rank-row.top1 { border-left-color: var(--orange); background: linear-gradient(90deg, rgba(255,107,0,0.15), var(--bg-2)); }
+.rank-row.top2 { border-left-color: var(--green); }
+.rank-row.top3 { border-left-color: #888; }
+.rank-num {
+  font-family: var(--display);
+  font-size: 28px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.rank-row.top1 .rank-num { color: var(--orange); }
+.rank-row.top2 .rank-num { color: var(--green); }
+.rank-info .name { font-size: 16px; font-weight: 700; }
+.rank-info .date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.rank-score {
+  font-family: var(--display);
+  font-size: 32px;
+  color: var(--white);
+  letter-spacing: 1px;
+}
+.rank-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 60px 20px;
+  font-size: 14px;
+}
+.rank-footer {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+.rank-footer .btn { flex: 1; }
+
+/* ========= UTIL ========= */
+.hide { display: none !important; }
+
+/* ========= PERMISSION / ERROR OVERLAY ========= */
+.sys-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(10,10,10,0.95);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+}
+.sys-overlay.show { display: flex; }
+.sys-title {
+  font-family: var(--display);
+  font-size: 32px;
+  letter-spacing: 2px;
+  color: var(--orange);
+  margin-bottom: 10px;
+}
+.sys-msg {
+  color: var(--white);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 320px;
+}
+.sys-overlay .btn {
+  margin-top: 20px;
+  max-width: 240px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- CAMERA LAYER (shared) -->
+  <div class="camera-layer" id="cameraLayer">
+    <video id="videoInput" playsinline muted autoplay></video>
+    <canvas id="canvasOutput"></canvas>
+  </div>
+
+  <!-- SCREEN 1: MODE -->
+  <section class="screen active" id="screen-mode">
+    <div class="mode-header">
+      <div class="mode-tag">DAEGU IL MIDDLE · PE</div>
+      <h1 class="mode-title">SQUAT<br><span class="accent">CHALLENGE</span></h1>
+      <div class="mode-subtitle">MediaPipe Pose · 1분 기록 도전</div>
+      <div class="mode-divider"></div>
+    </div>
+    <div class="mode-cta">
+      <button class="mode-btn" data-mode="normal">
+        <span class="num">01</span>
+        <span class="label">
+          <div class="label-ko">일반 모드</div>
+          <div class="label-en">PRACTICE · 자유 측정</div>
+        </span>
+        <span class="arrow">→</span>
+      </button>
+      <button class="mode-btn challenge" data-mode="challenge">
+        <span class="num">02</span>
+        <span class="label">
+          <div class="label-ko">도전 모드</div>
+          <div class="label-en">CHALLENGE · 1분 · 순위등록</div>
+        </span>
+        <span class="arrow">→</span>
+      </button>
+      <div class="mode-footer">
+        <button class="mode-link" id="btnOpenRanking">순위 보기 →</button>
+        <button class="mode-link" id="btnClearRanking">기록 초기화</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCREEN 2: INFO -->
+  <section class="screen" id="screen-info">
+    <div class="info-header">
+      <div class="mode-tag">STEP 01</div>
+      <h2 class="info-title">참가자 정보</h2>
+      <div class="info-sub">순위 등록을 위해 이름과 연락처를 입력해 주세요.</div>
+    </div>
+    <div class="info-form">
+      <div class="field">
+        <label>NAME · 이름</label>
+        <input type="text" id="inputName" placeholder="홍길동" maxlength="20" autocomplete="name">
+      </div>
+      <div class="field">
+        <label>PHONE · 전화번호</label>
+        <input type="tel" id="inputPhone" placeholder="010-0000-0000" maxlength="13" inputmode="numeric" autocomplete="tel">
+      </div>
+    </div>
+    <div class="info-actions">
+      <button class="btn btn-secondary" data-nav="mode">BACK</button>
+      <button class="btn btn-primary" id="btnInfoNext">NEXT →</button>
+    </div>
+  </section>
+
+  <!-- SCREEN 3: CALIBRATION -->
+  <section class="screen" id="screen-calibration">
+    <div class="cal-top">
+      <div class="cal-title">CALIBRATION</div>
+      <div class="cal-hint">카메라 앞에 서서 주황선을 무릎, 초록선을 허리에 맞추세요</div>
+      <div class="cal-legend">
+        <span><div class="dot orange"></div> 무릎선(KNEE)</span>
+        <span><div class="dot green"></div> 허리선(WAIST)</span>
+      </div>
+    </div>
+    <div class="cal-controls">
+      <div class="cal-side">
+        <div class="cal-btn-group waist">
+          <div class="cal-label">허리 ▲</div>
+          <button class="cal-btn" data-cal="waist" data-dir="-1">▲</button>
+          <button class="cal-btn" data-cal="waist" data-dir="1">▼</button>
+        </div>
+      </div>
+      <div class="cal-side">
+        <div class="cal-btn-group knee">
+          <div class="cal-label">무릎 ▲</div>
+          <button class="cal-btn" data-cal="knee" data-dir="-1">▲</button>
+          <button class="cal-btn" data-cal="knee" data-dir="1">▼</button>
+        </div>
+      </div>
+    </div>
+    <div class="cal-bottom">
+      <button class="btn btn-secondary" data-nav="back-from-cal">BACK</button>
+      <button class="btn btn-primary" id="btnCalDone">완료 · READY →</button>
+    </div>
+  </section>
+
+  <!-- SCREEN 4: READY -->
+  <section class="screen" id="screen-ready">
+    <div class="ready-top">
+      <div class="ready-title">READY</div>
+      <div class="ready-hint">원 안에 손을 3초 동안 유지하면 시작됩니다</div>
+    </div>
+    <div class="ready-bottom">
+      <button class="btn btn-ghost" data-nav="back-from-ready">다시 캘리브레이션</button>
+    </div>
+  </section>
+
+  <!-- SCREEN 5: COUNTDOWN -->
+  <section class="screen" id="screen-countdown">
+    <div class="countdown-num" id="countdownNum">3</div>
+  </section>
+
+  <!-- SCREEN 6: EXERCISE HUD -->
+  <section class="screen" id="screen-exercise">
+    <div class="hud-top">
+      <div class="hud-timer" id="hudTimer">
+        <div class="lbl">TIME</div>
+        <div class="val" id="timerVal">60</div>
+      </div>
+      <div class="hud-count">
+        <div class="lbl">COUNT</div>
+        <div class="val" id="countVal">0</div>
+      </div>
+    </div>
+    <button class="exit-btn" id="btnExerciseExit">✕</button>
+    <div class="hud-state">
+      <div class="state-badge" id="stateUp">UP</div>
+      <div class="state-badge" id="stateDown">DOWN</div>
+    </div>
+  </section>
+
+  <!-- SCREEN 7: RESULT -->
+  <section class="screen" id="screen-result">
+    <div class="result-header">
+      <div class="result-label">YOUR RESULT</div>
+      <div class="result-user" id="resultUser">—</div>
+    </div>
+    <div class="result-score">
+      <div class="num" id="resultCount">0</div>
+      <div class="unit">REPS</div>
+      <div class="result-meta">
+        <div>
+          <div class="k">TIME</div>
+          <div class="v" id="resultTime">60s</div>
+        </div>
+        <div>
+          <div class="k">MODE</div>
+          <div class="v" id="resultMode">NORMAL</div>
+        </div>
+      </div>
+    </div>
+    <div class="result-actions">
+      <div class="submit-status" id="submitStatus"></div>
+      <div class="row">
+        <button class="btn btn-secondary" id="btnDownloadVideo">영상 저장</button>
+        <button class="btn btn-secondary" id="btnViewRanking">순위 →</button>
+      </div>
+      <button class="btn btn-primary" id="btnRetry">다시 하기</button>
+      <button class="btn btn-ghost" data-nav="mode">홈으로</button>
+    </div>
+  </section>
+
+  <!-- SCREEN 8: RANKING -->
+  <section class="screen" id="screen-ranking">
+    <div class="rank-header">
+      <div class="rank-title">RANK<span class="accent">ING</span></div>
+      <div class="rank-count" id="rankCount">0 records</div>
+    </div>
+    <div class="rank-list" id="rankList"></div>
+    <div class="rank-footer">
+      <button class="btn btn-secondary" data-nav="mode">홈으로</button>
+    </div>
+  </section>
+
+  <!-- ERROR / PERMISSION OVERLAY -->
+  <div class="sys-overlay" id="sysOverlay">
+    <div class="sys-title" id="sysTitle">알림</div>
+    <div class="sys-msg" id="sysMsg"></div>
+    <button class="btn btn-primary" id="sysBtn">확인</button>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ========= CONFIG =========
+const CONFIG = {
+  // Google Apps Script 웹 앱 URL (POST 엔드포인트). 비워두면 전송 스킵.
+  SHEETS_WEBHOOK_URL: '',
+  CHALLENGE_DURATION: 60,        // 초
+  GESTURE_HOLD_MS: 3000,         // 제스처 홀드 시간
+  GESTURE_RADIUS_RATIO: 0.18,    // 화면 짧은 변 기준 원 반지름
+  STORAGE_KEY: 'squat-challenge-v1-ranking',
+  MAX_RANK: 50
+};
+
+// ========= STATE =========
+const S = {
+  screen: 'mode',
+  mode: null,                              // 'normal' | 'challenge'
+  user: { name: '', phone: '' },
+  cal: { kneeY: 0.72, waistY: 0.42 },
+  squat: { pose: 'up', count: 0 },
+  challenge: { start: 0, remaining: CONFIG.CHALLENGE_DURATION, timerId: null },
+  gesture: { inside: false, since: 0 },
+  poseResults: null,
+  poseReady: false,
+  stream: null,
+  rec: { mr: null, chunks: [], blob: null, url: null },
+  rafId: null,
+  running: false
+};
+
+// ========= DOM =========
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+const video = $('#videoInput');
+const canvas = $('#canvasOutput');
+const ctx = canvas.getContext('2d');
+const cameraLayer = $('#cameraLayer');
+
+// ========= SCREEN NAV =========
+function showScreen(id) {
+  $$('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + id);
+  if (el) el.classList.add('active');
+  S.screen = id;
+
+  // 카메라 레이어는 캘리브레이션/레디/운동 중 표시
+  const needsCam = ['calibration', 'ready', 'countdown', 'exercise'].includes(id);
+  cameraLayer.classList.toggle('show', needsCam);
+}
+
+function showOverlay(title, msg, btnText = '확인', onOk) {
+  $('#sysTitle').textContent = title;
+  $('#sysMsg').textContent = msg;
+  $('#sysBtn').textContent = btnText;
+  $('#sysOverlay').classList.add('show');
+  $('#sysBtn').onclick = () => {
+    $('#sysOverlay').classList.remove('show');
+    if (onOk) onOk();
+  };
+}
+
+// ========= AUDIO (Web Audio + iOS 대응) =========
+let audioCtx = null;
+async function ensureAudio() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
+}
+function beep(freq = 880, dur = 0.1, type = 'sine', vol = 0.3) {
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const now = audioCtx.currentTime;
+  gain.gain.setValueAtTime(vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + dur);
+}
+function playCount()     { beep(1200, 0.06, 'square', 0.22); }
+function playTick()      { beep(600, 0.08, 'sine', 0.25); }
+function playGo()        { beep(440, 0.4, 'triangle', 0.35); }
+function playFinish() {
+  beep(880, 0.18, 'triangle', 0.32);
+  setTimeout(() => beep(1320, 0.35, 'triangle', 0.32), 200);
+}
+function playReady()     { beep(1800, 0.04, 'sine', 0.18); }
+
+// ========= CAMERA =========
+async function startCamera() {
+  if (S.stream) return S.stream;
+  try {
+    S.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = S.stream;
+    await new Promise(resolve => {
+      if (video.readyState >= 2) resolve();
+      else video.onloadedmetadata = () => resolve();
+    });
+    await video.play();
+    resizeCanvas();
+    return S.stream;
+  } catch (e) {
+    showOverlay('카메라 권한 필요', '브라우저 설정에서 카메라 접근을 허용해 주세요.\n\n' + (e.message || ''));
+    throw e;
+  }
+}
+
+function stopCamera() {
+  stopRafLoop();
+  if (S.stream) {
+    S.stream.getTracks().forEach(t => t.stop());
+    S.stream = null;
+  }
+}
+
+function resizeCanvas() {
+  const rect = cameraLayer.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+}
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+
+// ========= MEDIAPIPE POSE =========
+let pose = null;
+function initPose() {
+  if (pose) return;
+  pose = new Pose({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+  });
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  pose.onResults((results) => { S.poseResults = results; });
+}
+
+async function sendFrame() {
+  if (!pose || video.readyState < 2) return;
+  try {
+    await pose.send({ image: video });
+    S.poseReady = true;
+  } catch (e) { /* ignore intermittent errors */ }
+}
+
+// ========= MAIN LOOP (카메라+캔버스 렌더+포즈처리+상태업데이트) =========
+async function renderLoop() {
+  if (!S.running) return;
+  // 1) Pose 프레임 전송
+  await sendFrame();
+
+  // 2) 캔버스 그리기 (미러링)
+  const cw = canvas.width, ch = canvas.height;
+  ctx.save();
+  ctx.clearRect(0, 0, cw, ch);
+
+  // 비디오를 cover 형태로 그리기 (미러)
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (vw && vh) {
+    const vRatio = vw / vh;
+    const cRatio = cw / ch;
+    let dw, dh, dx, dy;
+    if (vRatio > cRatio) {
+      dh = ch; dw = ch * vRatio;
+      dx = (cw - dw) / 2; dy = 0;
+    } else {
+      dw = cw; dh = cw / vRatio;
+      dx = 0; dy = (ch - dh) / 2;
+    }
+    ctx.save();
+    ctx.translate(cw, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, cw - dx - dw, dy, dw, dh);
+    ctx.restore();
+  }
+
+  // 3) 화면별 오버레이
+  if (S.screen === 'calibration') drawCalibration();
+  if (S.screen === 'ready')       drawReady();
+  if (S.screen === 'exercise')    drawExercise();
+
+  ctx.restore();
+
+  // 4) 운동 상태 판정
+  if (S.screen === 'exercise') processSquat();
+  if (S.screen === 'ready')    processGesture();
+
+  S.rafId = requestAnimationFrame(renderLoop);
+}
+function startRafLoop() {
+  if (S.running) return;
+  S.running = true;
+  S.rafId = requestAnimationFrame(renderLoop);
+}
+function stopRafLoop() {
+  S.running = false;
+  if (S.rafId) cancelAnimationFrame(S.rafId);
+  S.rafId = null;
+}
+
+// ========= OVERLAY: CALIBRATION =========
+function drawCalibration() {
+  const cw = canvas.width, ch = canvas.height;
+  const kneeY = ch * S.cal.kneeY;
+  const waistY = ch * S.cal.waistY;
+  drawLine(waistY, '#00FF8A', 'WAIST', true);
+  drawLine(kneeY, '#FF6B00', 'KNEE', false);
+
+  // 포즈 점(손목/무릎/허리) 가이드
+  if (S.poseResults && S.poseResults.poseLandmarks) {
+    const lm = S.poseResults.poseLandmarks;
+    drawPoint(lm[15], cw, ch, '#00FF8A'); // L wrist
+    drawPoint(lm[16], cw, ch, '#00FF8A'); // R wrist
+    drawPoint(lm[25], cw, ch, '#FF6B00'); // L knee
+    drawPoint(lm[26], cw, ch, '#FF6B00'); // R knee
+    drawPoint(lm[23], cw, ch, '#00FF8A'); // L hip
+    drawPoint(lm[24], cw, ch, '#00FF8A'); // R hip
+  }
+}
+function drawLine(y, color, label, labelLeft) {
+  const cw = canvas.width;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 8]);
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(cw, y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // label
+  ctx.font = '600 12px "Bebas Neue", sans-serif';
+  ctx.fillStyle = color;
+  const text = label;
+  const tw = ctx.measureText(text).width;
+  const pad = 8, x = labelLeft ? 14 : cw - 14 - tw - pad * 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(x, y - 22, tw + pad * 2, 18);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x + pad, y - 9);
+  ctx.restore();
+}
+function drawPoint(lm, cw, ch, color) {
+  if (!lm || lm.visibility < 0.3) return;
+  // MediaPipe 좌표는 비거울 기준. 캔버스는 좌우반전되어 그려졌으므로 x를 뒤집어야 화면과 일치.
+  const x = (1 - lm.x) * cw;
+  const y = lm.y * ch;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ========= OVERLAY: READY (제스처 존) =========
+function drawReady() {
+  const cw = canvas.width, ch = canvas.height;
+  const cx = cw / 2, cy = ch * 0.5;
+  const r = Math.min(cw, ch) * CONFIG.GESTURE_RADIUS_RATIO;
+
+  // dim background
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // outer circle
+  ctx.save();
+  ctx.strokeStyle = S.gesture.inside ? '#00FF8A' : '#FF6B00';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // progress ring
+  if (S.gesture.inside) {
+    const hold = Math.min(1, (performance.now() - S.gesture.since) / CONFIG.GESTURE_HOLD_MS);
+    ctx.strokeStyle = '#00FF8A';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hold);
+    ctx.stroke();
+  }
+
+  // center icon
+  ctx.fillStyle = S.gesture.inside ? '#00FF8A' : '#FF6B00';
+  ctx.font = 'bold 40px "Bebas Neue"';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✋', cx, cy);
+  ctx.restore();
+
+  // wrist markers
+  if (S.poseResults && S.poseResults.poseLandmarks) {
+    const lm = S.poseResults.poseLandmarks;
+    drawPoint(lm[15], cw, ch, '#FFFFFF');
+    drawPoint(lm[16], cw, ch, '#FFFFFF');
+  }
+}
+
+// ========= OVERLAY: EXERCISE (보조 가이드 라인) =========
+function drawExercise() {
+  const ch = canvas.height;
+  const kneeY = ch * S.cal.kneeY;
+  const waistY = ch * S.cal.waistY;
+
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = '#FF6B00';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.moveTo(0, kneeY);
+  ctx.lineTo(canvas.width, kneeY);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#00FF8A';
+  ctx.beginPath();
+  ctx.moveTo(0, waistY);
+  ctx.lineTo(canvas.width, waistY);
+  ctx.stroke();
+  ctx.restore();
+
+  // 손목 마커
+  if (S.poseResults && S.poseResults.poseLandmarks) {
+    const lm = S.poseResults.poseLandmarks;
+    const w = avgWrist(lm);
+    if (w != null) {
+      drawPoint({ x: w.x, y: w.y, visibility: 1 }, canvas.width, canvas.height,
+                S.squat.pose === 'down' ? '#FF6B00' : '#00FF8A');
+    }
+  }
+}
+
+// ========= SQUAT LOGIC =========
+function avgWrist(lm) {
+  const lW = lm[15], rW = lm[16];
+  if (!lW || !rW) return null;
+  const vis = (lW.visibility + rW.visibility) / 2;
+  if (vis < 0.3) return null;
+  return { x: (lW.x + rW.x) / 2, y: (lW.y + rW.y) / 2 };
+}
+function processSquat() {
+  if (!S.poseResults || !S.poseResults.poseLandmarks) return;
+  const lm = S.poseResults.poseLandmarks;
+  const w = avgWrist(lm);
+  if (!w) return;
+
+  // 손목Y > 무릎선 → DOWN
+  if (S.squat.pose === 'up' && w.y > S.cal.kneeY) {
+    S.squat.pose = 'down';
+    updateStateBadges();
+  }
+  // 손목Y < 허리선 → UP → count++
+  else if (S.squat.pose === 'down' && w.y < S.cal.waistY) {
+    S.squat.pose = 'up';
+    S.squat.count++;
+    playCount();
+    updateStateBadges();
+    $('#countVal').textContent = S.squat.count;
+    // pulse effect
+    const el = $('#countVal');
+    el.style.transition = 'transform 0.1s';
+    el.style.transform = 'scale(1.3)';
+    setTimeout(() => { el.style.transform = 'scale(1)'; }, 120);
+  }
+}
+function updateStateBadges() {
+  const up = $('#stateUp'), down = $('#stateDown');
+  up.classList.toggle('active', S.squat.pose === 'up');
+  up.classList.toggle('up', S.squat.pose === 'up');
+  down.classList.toggle('active', S.squat.pose === 'down');
+  down.classList.toggle('down', S.squat.pose === 'down');
+}
+
+// ========= GESTURE LOGIC (READY → COUNTDOWN 자동시작) =========
+function processGesture() {
+  if (!S.poseResults || !S.poseResults.poseLandmarks) {
+    if (S.gesture.inside) { S.gesture.inside = false; }
+    return;
+  }
+  const lm = S.poseResults.poseLandmarks;
+  const w = avgWrist(lm);
+  if (!w) return;
+
+  // 캔버스 기준 좌표 (거울 반전 고려)
+  const cw = canvas.width, ch = canvas.height;
+  const cx = cw / 2, cy = ch * 0.5;
+  const r = Math.min(cw, ch) * CONFIG.GESTURE_RADIUS_RATIO;
+  const wx = (1 - w.x) * cw;
+  const wy = w.y * ch;
+  const dist = Math.hypot(wx - cx, wy - cy);
+
+  const inside = dist < r;
+  if (inside && !S.gesture.inside) {
+    S.gesture.inside = true;
+    S.gesture.since = performance.now();
+    playReady();
+  } else if (!inside && S.gesture.inside) {
+    S.gesture.inside = false;
+  }
+
+  if (S.gesture.inside && performance.now() - S.gesture.since >= CONFIG.GESTURE_HOLD_MS) {
+    S.gesture.inside = false;
+    startCountdown();
+  }
+}
+
+// ========= COUNTDOWN =========
+function startCountdown() {
+  showScreen('countdown');
+  const el = $('#countdownNum');
+  let n = 3;
+  el.textContent = n;
+  el.classList.remove('go');
+  // restart animation
+  el.style.animation = 'none';
+  void el.offsetHeight;
+  el.style.animation = '';
+  playTick();
+
+  const step = () => {
+    n--;
+    if (n > 0) {
+      el.textContent = n;
+      el.classList.remove('go');
+      el.style.animation = 'none';
+      void el.offsetHeight;
+      el.style.animation = '';
+      playTick();
+      setTimeout(step, 1000);
+    } else {
+      el.textContent = 'GO!';
+      el.classList.add('go');
+      el.style.animation = 'none';
+      void el.offsetHeight;
+      el.style.animation = '';
+      playGo();
+      setTimeout(() => startExercise(), 800);
+    }
+  };
+  setTimeout(step, 1000);
+}
+
+// ========= EXERCISE START/STOP =========
+function startExercise() {
+  // 리셋
+  S.squat.pose = 'up';
+  S.squat.count = 0;
+  $('#countVal').textContent = 0;
+  updateStateBadges();
+
+  // 타이머
+  const timerWrap = $('#hudTimer');
+  timerWrap.classList.remove('hide', 'warning', 'danger');
+  if (S.mode === 'challenge') {
+    timerWrap.classList.remove('hide');
+    S.challenge.remaining = CONFIG.CHALLENGE_DURATION;
+    S.challenge.start = performance.now();
+    $('#timerVal').textContent = CONFIG.CHALLENGE_DURATION;
+    S.challenge.timerId = setInterval(tickTimer, 100);
+    startRecording();
+  } else {
+    $('#timerVal').textContent = '∞';
+  }
+
+  showScreen('exercise');
+}
+function tickTimer() {
+  const elapsed = (performance.now() - S.challenge.start) / 1000;
+  const remain = Math.max(0, CONFIG.CHALLENGE_DURATION - elapsed);
+  const sec = Math.ceil(remain);
+  $('#timerVal').textContent = sec;
+  const wrap = $('#hudTimer');
+  wrap.classList.toggle('warning', sec <= 20 && sec > 10);
+  wrap.classList.toggle('danger', sec <= 10);
+  if (sec <= 3 && sec > 0 && Math.floor(elapsed) !== S.challenge._lastBeep) {
+    S.challenge._lastBeep = Math.floor(elapsed);
+    beep(1500, 0.08, 'sine', 0.25);
+  }
+  if (remain <= 0) finishExercise();
+}
+function finishExercise(manual = false) {
+  if (S.challenge.timerId) { clearInterval(S.challenge.timerId); S.challenge.timerId = null; }
+  if (S.mode === 'challenge' && !manual) playFinish();
+  if (S.mode === 'challenge') stopRecording();
+  showResult();
+}
+
+// ========= RECORDER =========
+function startRecording() {
+  if (!window.MediaRecorder || !S.stream) return;
+  try {
+    S.rec.chunks = [];
+    const mimes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+    const mime = mimes.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    const opt = mime ? { mimeType: mime } : {};
+    S.rec.mr = new MediaRecorder(S.stream, opt);
+    S.rec.mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) S.rec.chunks.push(e.data); };
+    S.rec.mr.onstop = () => {
+      const type = S.rec.mr.mimeType || 'video/webm';
+      S.rec.blob = new Blob(S.rec.chunks, { type });
+      if (S.rec.url) URL.revokeObjectURL(S.rec.url);
+      S.rec.url = URL.createObjectURL(S.rec.blob);
+    };
+    S.rec.mr.start(1000);
+  } catch (e) {
+    console.warn('Recording not available:', e);
+  }
+}
+function stopRecording() {
+  try { if (S.rec.mr && S.rec.mr.state !== 'inactive') S.rec.mr.stop(); } catch (e) {}
+}
+
+// ========= RESULT =========
+function showResult() {
+  $('#resultUser').textContent = S.mode === 'challenge'
+    ? `${S.user.name} · ${S.user.phone}` : '일반 연습';
+  $('#resultCount').textContent = S.squat.count;
+  $('#resultTime').textContent = S.mode === 'challenge' ? CONFIG.CHALLENGE_DURATION + 's' : 'FREE';
+  $('#resultMode').textContent = S.mode === 'challenge' ? 'CHALLENGE' : 'NORMAL';
+  $('#submitStatus').textContent = '';
+  $('#submitStatus').className = 'submit-status';
+
+  $('#btnDownloadVideo').disabled = !S.rec.blob;
+  $('#btnDownloadVideo').style.opacity = S.rec.blob ? '1' : '0.4';
+
+  showScreen('result');
+
+  if (S.mode === 'challenge') {
+    saveLocalRanking();
+    submitToSheets();
+  }
+}
+
+// ========= LOCAL RANKING =========
+function loadRanking() {
+  try { return JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveLocalRanking() {
+  const list = loadRanking();
+  list.push({
+    name: S.user.name,
+    phone: S.user.phone,
+    count: S.squat.count,
+    time: CONFIG.CHALLENGE_DURATION,
+    mode: S.mode,
+    at: Date.now()
+  });
+  list.sort((a, b) => b.count - a.count);
+  list.splice(CONFIG.MAX_RANK);
+  localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(list));
+}
+function renderRanking() {
+  const list = loadRanking();
+  const cont = $('#rankList');
+  $('#rankCount').textContent = list.length + ' records';
+  cont.innerHTML = '';
+  if (list.length === 0) {
+    cont.innerHTML = '<div class="rank-empty">아직 기록이 없습니다.<br>도전 모드에서 기록을 남겨 보세요.</div>';
+    return;
+  }
+  list.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'rank-row' + (i < 3 ? ' top' + (i + 1) : '');
+    const d = new Date(it.at);
+    const dateStr = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    row.innerHTML = `
+      <div class="rank-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="rank-info">
+        <div class="name">${escapeHtml(it.name || '-')}</div>
+        <div class="date">${dateStr} · ${it.time}s</div>
+      </div>
+      <div class="rank-score">${it.count}</div>
+    `;
+    cont.appendChild(row);
+  });
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ========= GOOGLE SHEETS SUBMIT =========
+async function submitToSheets() {
+  const statusEl = $('#submitStatus');
+  if (!CONFIG.SHEETS_WEBHOOK_URL) {
+    statusEl.className = 'submit-status';
+    statusEl.textContent = 'Sheets URL 미설정 · 로컬 저장됨';
+    return;
+  }
+  statusEl.textContent = '순위 서버에 기록 중...';
+  statusEl.className = 'submit-status';
+  try {
+    await fetch(CONFIG.SHEETS_WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        name: S.user.name,
+        phone: S.user.phone,
+        count: S.squat.count,
+        duration: CONFIG.CHALLENGE_DURATION,
+        mode: S.mode,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      })
+    });
+    statusEl.textContent = '✓ 서버 전송 완료';
+    statusEl.className = 'submit-status ok';
+  } catch (e) {
+    statusEl.textContent = '✗ 서버 전송 실패 (로컬에는 저장됨)';
+    statusEl.className = 'submit-status err';
+  }
+}
+
+// ========= EVENTS =========
+document.addEventListener('DOMContentLoaded', () => {
+  // 모드 선택
+  $$('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await ensureAudio();
+      S.mode = btn.dataset.mode;
+      initPose();
+      if (S.mode === 'challenge') {
+        showScreen('info');
+      } else {
+        goToCalibration();
+      }
+    });
+  });
+
+  $('#btnOpenRanking').addEventListener('click', () => {
+    renderRanking();
+    showScreen('ranking');
+  });
+  $('#btnClearRanking').addEventListener('click', () => {
+    if (confirm('모든 로컬 기록을 삭제하시겠습니까?')) {
+      localStorage.removeItem(CONFIG.STORAGE_KEY);
+      alert('삭제되었습니다.');
+    }
+  });
+
+  // 정보 입력
+  $('#inputPhone').addEventListener('input', (e) => {
+    let v = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+    if (v.length >= 7) v = v.slice(0,3) + '-' + v.slice(3,7) + '-' + v.slice(7);
+    else if (v.length >= 4) v = v.slice(0,3) + '-' + v.slice(3);
+    e.target.value = v;
+  });
+  $('#btnInfoNext').addEventListener('click', () => {
+    const name = $('#inputName').value.trim();
+    const phone = $('#inputPhone').value.trim();
+    if (!name) return showOverlay('입력 필요', '이름을 입력해 주세요.');
+    if (!/^010-\d{3,4}-\d{4}$/.test(phone)) return showOverlay('입력 확인', '전화번호 형식을 확인해 주세요.\n예: 010-1234-5678');
+    S.user.name = name;
+    S.user.phone = phone;
+    goToCalibration();
+  });
+
+  // Back / Nav
+  $$('[data-nav]').forEach(el => {
+    el.addEventListener('click', () => {
+      const to = el.dataset.nav;
+      if (to === 'mode') {
+        stopCamera();
+        showScreen('mode');
+      } else if (to === 'back-from-cal') {
+        stopCamera();
+        if (S.mode === 'challenge') showScreen('info');
+        else showScreen('mode');
+      } else if (to === 'back-from-ready') {
+        showScreen('calibration');
+      } else {
+        showScreen(to);
+      }
+    });
+  });
+
+  // Calibration 버튼
+  $$('[data-cal]').forEach(btn => {
+    const step = () => {
+      const which = btn.dataset.cal; // 'knee' | 'waist'
+      const dir = parseInt(btn.dataset.dir, 10); // -1 up, +1 down
+      const key = which === 'knee' ? 'kneeY' : 'waistY';
+      const newVal = Math.min(0.98, Math.max(0.02, S.cal[key] + dir * 0.015));
+      S.cal[key] = newVal;
+      // keep knee below waist
+      if (S.cal.kneeY < S.cal.waistY + 0.05) {
+        if (which === 'knee') S.cal.kneeY = S.cal.waistY + 0.05;
+        else S.cal.waistY = S.cal.kneeY - 0.05;
+      }
+    };
+    btn.addEventListener('click', step);
+    // long-press 지원
+    let pressId = null;
+    const startPress = () => { step(); pressId = setInterval(step, 120); };
+    const endPress = () => { if (pressId) { clearInterval(pressId); pressId = null; } };
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); startPress(); }, { passive: false });
+    btn.addEventListener('touchend', endPress);
+    btn.addEventListener('mousedown', startPress);
+    btn.addEventListener('mouseup', endPress);
+    btn.addEventListener('mouseleave', endPress);
+  });
+
+  $('#btnCalDone').addEventListener('click', () => {
+    showScreen('ready');
+  });
+
+  // Exercise exit
+  $('#btnExerciseExit').addEventListener('click', () => {
+    if (confirm('측정을 중단하시겠습니까?')) {
+      finishExercise(true);
+    }
+  });
+
+  // Result 버튼들
+  $('#btnDownloadVideo').addEventListener('click', () => {
+    if (!S.rec.url) return;
+    const a = document.createElement('a');
+    a.href = S.rec.url;
+    const ext = (S.rec.mr && S.rec.mr.mimeType && S.rec.mr.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+    a.download = `squat_${S.user.name || 'user'}_${S.squat.count}reps.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+  $('#btnViewRanking').addEventListener('click', () => {
+    renderRanking();
+    showScreen('ranking');
+  });
+  $('#btnRetry').addEventListener('click', () => {
+    goToCalibration();
+  });
+});
+
+async function goToCalibration() {
+  showScreen('calibration');
+  try {
+    await startCamera();
+    startRafLoop();
+  } catch (e) {
+    showScreen(S.mode === 'challenge' ? 'info' : 'mode');
+  }
+}
+
+// Handle page visibility — stop stream/pose to save resources
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (S.screen === 'exercise' && S.mode === 'challenge') {
+      // 챌린지 도중 이탈은 중단 처리
+      finishExercise(true);
+    }
+  }
+});
+
+// Prevent pull-to-refresh on iOS
+document.addEventListener('touchmove', (e) => {
+  if (e.target === document.body || e.target.closest('.screen:not(.active)')) {
+    e.preventDefault();
+  }
+}, { passive: false });
+</script>
+</body>
+</html>
